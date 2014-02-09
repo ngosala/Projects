@@ -1,0 +1,1 @@
+PROMPT MyShell>> ;.; PATH/usr/bin:/bin: ;.; HOME /home
