@@ -193,25 +193,47 @@ void parser(char *readline, char**argv) {
 	*argv = '\0';
 }
 
-void Redirect(char *command){
-        char *token1;
-	char *token2;
-	int pid, fd;
-	int flag = 1;
-	token1 = strtok(command, "=>");
-	token2 = strtok(NULL, "=>");
-        int i=0,j=0;
-        while (token2[i] == ' ') {
-		j = 0;
-		while (token2[j]) {
-			token2[j] = token2[j + 1];
-			j++;
-		}
-		i++;
+void Redirect(char *cmd,char *argv[]){
+        char *command;
+	char line[100];
+	FILE *fpipe;
+	FILE *outfile;
+	char *filename;
+        int i;
+        for(i=0;i<sizeof(argv)-1;i++){
+            printf("\nag %s",argv[i]);
+            if(argv[i]==">"){
+                printf("here %s",argv[i]);
+                filename=argv[i++];
+                break;
+
+            }
+
+        }
+     
+        command=strtok(cmd,">");
+     //   printf("command %s",filename);
+
+	// Open Pipe to redirect the command
+	if( ! (fpipe =(FILE *)popen(command, "r") ) )
+	{
+		printf("Unable to execute the command !\n");
+		exit(1);
 	}
-        
-        
-    
+
+	// Open File Stream to write
+	if(!(outfile=fopen((char *)filename, "wb"))){
+		printf("Open file failed!\n");
+		exit(1);
+	}
+
+	/* read stream from input file and write the stream to the output file */
+	while(fgets(line,sizeof(line),fpipe))
+		fprintf(outfile,"%s", line);
+
+	pclose(fpipe);
+	fclose(outfile);
+	free(command);
 
 
 }
@@ -269,7 +291,7 @@ FILE* pipeout_fp[256];
         
         if(strstr(command,"=>")!=NULL){
         
-            Redirect(command);
+            Redirect(command,NULL);
         
         }
         else{
@@ -323,6 +345,7 @@ void executePipeCommand(char *readline){
 int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
+    char temp[MAX_LENGTH];
     
        //  char str[]="nIkHeLeL";
   //  printf("%s",Lower(str));
@@ -356,17 +379,20 @@ int main(int argc, char *argv[], char *envp[])
                         
                   fflush(stdin);
                   
-			parser(readline, argv);
-                       
+			//parser(readline, argv);
+
 			if (strcmp(argv[0], "exit") == 0) {
                             
 				printf("\n GoodBye...\n");
 				exit(0);
 			}
-            
+                       
+                        
 			else 			
 			if (strstr(readline, ">") != NULL) {
-                            Redirect(readline);
+                            strcpy(temp,readline);
+                            parser(readline, argv);
+                            Redirect(temp,argv);
 			} else if (strcmp(readline, "getpid") == 0){
 				int pid=createProcess();
                         printf("%d",pid);
@@ -374,9 +400,10 @@ int main(int argc, char *argv[], char *envp[])
 			else if (strstr(readline, "|") != NULL)
 				executePipeCommand(readline);
 			else if (strstr(readline,"cd")!=NULL)
-            {
-                executeCdCommand(argv);
-            }
+                          {
+                            parser(readline, argv);
+                            executeCdCommand(argv);
+                         }
                         
                         else
                             ExecuteCommand(readline);
