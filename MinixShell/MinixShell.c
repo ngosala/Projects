@@ -448,6 +448,151 @@ void executecdCommand(char *argv[]){
     
     
 }
+void executeSetEnvCommand(char *readline){
+
+    char *var1;
+    char *constant1;
+    var1=strtok(readline,"=");
+    constant1=strtok(NULL,"=");
+    setenv(var1,constant1,0);
+
+
+}
+
+void executeCalcCommand(char *readline){
+    int var1;
+    int var2;
+    char *var5;
+    char *var4;
+    char *var3;
+    char *temp;
+    char *buff;
+    int res;
+    if((strstr(readline,"="))!=NULL){
+    
+      var3=strtok(readline,"=");
+      temp=strtok(NULL,"=");
+        
+    }
+    else{
+    
+        temp=readline;
+    
+    }
+    if(strstr(temp,"+")!=NULL){
+        var4=(strtok(temp,"+"));
+        var5=(strtok(NULL,"+"));
+        
+        if((buff=getenv(var4))!=NULL){
+        var1=atoi(buff);
+        }
+        else{
+        var1=atoi(var4);
+        }
+         if((buff=getenv(var5))!=NULL){
+        var2=atoi(buff);
+        }
+        else{
+        var2=atoi(var5);
+        }
+       
+        res=(var1+var2);
+        printf("%d",res);
+    
+    }
+    else if(strstr(temp,"-")!=NULL){
+          var4=(strtok(temp,"-"));
+        var5=(strtok(NULL,"-"));
+        
+        if((buff=getenv(var4))!=NULL){
+        var1=atoi(buff);
+        }
+        else{
+        var1=atoi(var4);
+        }
+         if((buff=getenv(var5))!=NULL){
+        var2=atoi(buff);
+        }
+        else{
+        var2=atoi(var5);
+        }
+       
+        res=(var1-var2);
+        printf("%d",res);
+    }
+    else if(strstr(temp,"*")!=NULL){
+    
+            var4=(strtok(temp,"*"));
+        var5=(strtok(NULL,"*"));
+        
+        if((buff=getenv(var4))!=NULL){
+        var1=atoi(buff);
+        }
+        else{
+        var1=atoi(var4);
+        }
+         if((buff=getenv(var5))!=NULL){
+        var2=atoi(buff);
+        }
+        else{
+        var2=atoi(var5);
+        }
+       
+        res=(var1*var2);
+        printf("%d",res);
+    }
+    else if(strstr(temp,"/")!=NULL){
+    
+             var4=(strtok(temp,"/"));
+        var5=(strtok(NULL,"/"));
+        
+        if((buff=getenv(var4))!=NULL){
+        var1=atoi(buff);
+        }
+        else{
+        var1=atoi(var4);
+        }
+         if((buff=getenv(var5))!=NULL){
+        var2=atoi(buff);
+        }
+        else{
+        var2=atoi(var5);
+        }
+       
+        res=(var1/var2);
+        printf("%d",res);
+    }
+    else if(strstr(temp,"%")!=NULL){
+    
+           var4=(strtok(temp,"%"));
+        var5=(strtok(NULL,"%"));
+        
+        if((buff=getenv(var4))!=NULL){
+        var1=atoi(buff);
+        }
+        else{
+        var1=atoi(var4);
+        }
+         if((buff=getenv(var5))!=NULL){
+        var2=atoi(buff);
+        }
+        else{
+        var2=atoi(var5);
+        }
+       
+        res=(var1%var2);
+        printf("%d",res);
+    }
+   // if(var3!=NULL){
+    
+     //   setenv(var3,res,0);
+    
+   // }
+    
+    
+    
+
+}
 void executeechoCommand(char *command){
 
     char *token1;
@@ -465,11 +610,7 @@ int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
     char temp[MAX_LENGTH];
-    
-       //  char str[]="nIkHeLeL";
-  //  printf("%s",Lower(str));
-   
-         
+    PROMPT=NULL;
 
         //clear the window
 	if(fork() == 0) {
@@ -478,10 +619,10 @@ int main(int argc, char *argv[], char *envp[])
 		}
 	else wait(NULL);
         
-        printf("\nWelcome to Custom Shell\n\n");
+        printf("\nWelcome to Custom Shell\n");
 	printf("Nikhileswar Gosala\n");
 	printf("Geetha Sankineni\n");
-        printf("Harshitha Bandlam\n");
+        printf("Harshitha Bandlamudi\n");
     
         InitialiseEnvironment();
         setjmp(getinput);
@@ -538,11 +679,17 @@ int main(int argc, char *argv[], char *envp[])
                             parser(readline, argv);
                             executecdCommand(argv);
                          }
+                        else if(strstr(readline,"=")!=NULL){
                         
+                            executeSetEnvCommand(readline);
+                        }
+                        else if((strstr(readline,"+") || strstr(readline,"-") ||strstr(readline,"*") ||strstr(readline,"/") ||strstr(readline,"%")!=NULL)){
+                        
+                           executeCalcCommand(readline);
+                        }
                         else{ 
                              strcpy(temp,readline);
                              parser(readline, argv);
-                             // printf("argv %s",argv[0]);
                              if(argv[1]!=NULL){
                              
                                  ExecutecommandWithArgs(temp,argv);
