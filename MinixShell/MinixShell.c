@@ -26,7 +26,7 @@ int errno=0;
     int changedir;
     changedir=chdir(HomeDir);
     if(changedir!=0){
-        printf("Error Setting Home Directory :%s\n",strerror(errno));
+        printf("\nError while Setting Home Directory :%s\n",strerror(errno));
         
         return EC_OK;
     }
@@ -45,17 +45,11 @@ EC InitialiseEnvironment(){
     int i=0;
     char *str;
     FILE *fptr=fopen("PROFILE.txt","rb");
-    
 
-    
     while(!(feof(fptr))){
-    
-        
-        
+
         fgets(temp,MAX_LENGTH,fptr);
-        
-        
-    
+
     }
     fclose(fptr);
     // Reading HOME value
@@ -246,12 +240,12 @@ void Redirect(char *cmd,char *argv[]){
 void executePipeCommand(char *readline){
 
         FILE *pipein;
-	FILE* pipeout[MAX_LENGTH];
-	int i, j, k, numOfCommands=0;
-	char readbuf[MAX_LENGTH];
+	FILE *pipeout[MAX_LENGTH];
+	int numOfCommands=0;
+	char buffer[MAX_LENGTH];
 	char* cmd1;
 	char* cmd2[MAX_LENGTH];
-	
+	int i,j,k;
 	
         //find number of pipe commands
 	cmd1 = strtok(readline, "|");
@@ -270,50 +264,56 @@ void executePipeCommand(char *readline){
 	}
 	}
         
-        printf("%s",cmd2[1]);
-	
-	if ((pipein = popen(cmd1, "r")) == NULL) {
-		printf("Error executing command\n");
-		perror("popen");
-	    longjmp(getinput, 1);
-	}
-
+      
+        pipein = popen(cmd1, "r");
+        if(pipein==NULL){
+        
+            printf("Problem with Command");
+             longjmp(getinput, 1);
+            
+        }
+        
 	i=0;
-	
+	pipeout[i] = popen(cmd2[i], "w");
+        /*
 	if ((pipeout[i] = popen(cmd2[i], "w")) == NULL) {
-		printf("Error execting command\n");
-		perror("popen");
+		printf("Problem with command\n");
 		longjmp(getinput, 1);
 		
 	}
-	
+	*/
 
-	while (fgets(readbuf, 80, pipein)) {
+	while (fgets(buffer, MAX_LENGTH, pipein)) {
 	
-		fputs(readbuf, pipeout[i]);
+		fputs(buffer, pipeout[i]);
 	} 
 	
-
+        //close pipes
 	pclose(pipein);
         pclose(pipeout[i]);
 	
 	for(i=0;i<numOfCommands-1;i++) { 
+            /*
     	if ((pipeout[i] = popen(cmd2[i], "r")) == NULL) {
-		printf("Error executing command\n");
-		perror("popen");
-	    longjmp(getinput, 1);
-	}
+		printf("Problem with command\n");
+                longjmp(getinput, 1);
+             
 	
+        }
+             */
+        pipeout[i] = popen(cmd2[i], "r");
+	pipeout[i+1] = popen(cmd2[i+1], "w");
+        /*
 	if ((pipeout[i+1] = popen(cmd2[i+1], "w")) == NULL) {
-		printf("Error execting command\n");
-		perror("popen");
+		printf("Problem with command\n");	
 		longjmp(getinput, 1);
 		
 	}
+         */
 	
-    while (fgets(readbuf, MAX_LENGTH, pipeout[i])) {
+        while (fgets(buffer, MAX_LENGTH, pipeout[i])) {
 	
-		fputs(readbuf, pipeout[i+1]);
+		fputs(buffer, pipeout[i+1]);
 	}
     
 	pclose(pipeout[i]);
@@ -457,7 +457,7 @@ int main(int argc, char *argv[], char *envp[])
         
        while(1){
            sleep(1);
-                printf("%s",PROMPT); 
+              printf("%s",PROMPT); 
               gets(readline);
                  
                  // puts(readline);
@@ -480,7 +480,7 @@ int main(int argc, char *argv[], char *envp[])
                             Redirect(temp,argv);
 			} else if (strcmp(readline, "getpid") == 0){
 				int pid=createProcess();
-                        printf("%d",pid);
+                                printf("%d",pid);
                         }
 			else if (strstr(readline, "|") != NULL){
                             executePipeCommand(readline);
