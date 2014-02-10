@@ -12,7 +12,7 @@
 
 
 // Declaration Section
-char *PROMPT;
+char* PROMPT[MAX_LENGTH];
 char *PATH;
 char *HOME;
 static char* args[10];
@@ -84,10 +84,12 @@ EC InitialiseEnvironment(){
     pathstr=strstr(temp,"PROMPT");
     break;
     }
-     PROMPT=strtok(pathstr,";.;");
+   //  PROMPT=strtok(pathstr,";.;");
  
-     PROMPT=strstr(PROMPT,"My");
+    // PROMPT=strstr(PROMPT,"My");
     
+     getcwd(PROMPT,MAX_LENGTH);
+     strcat(PROMPT,">");
 
     SetHomeDir(HOME);
     
@@ -200,6 +202,7 @@ void Redirect(char *cmd,char *argv[]){
 	FILE *outfile;
 	char *filename;
         int i;
+        /*
         for(i=0;i<sizeof(argv)-1;i++){
             printf("\nag %s",argv[i]);
             if(argv[i]==">"){
@@ -210,9 +213,10 @@ void Redirect(char *cmd,char *argv[]){
             }
 
         }
-     
+     */
         command=strtok(cmd,">");
-     //   printf("command %s",filename);
+        filename=strtok(NULL,">");
+      // printf("command%s123",filename);
 
 	// Open Pipe to redirect the command
 	if( ! (fpipe =(FILE *)popen(command, "r") ) )
@@ -222,8 +226,9 @@ void Redirect(char *cmd,char *argv[]){
 	}
 
 	// Open File Stream to write
-	if(!(outfile=fopen((char *)filename, "wb"))){
+	if(!(outfile=fopen(filename, "wb"))){
 		printf("Open file failed!\n");
+                //perror(filename);
 		exit(1);
 	}
 
@@ -233,59 +238,93 @@ void Redirect(char *cmd,char *argv[]){
 
 	pclose(fpipe);
 	fclose(outfile);
-	free(command);
+	//free(command);
 
 
 }
 
-void piping(char *pipecommand){
-    
-                int fd[2];
-		pid_t pid;
-                char* token1;
-                char* token2[MAX_LENGTH];
-                int count=0;
-                token1 = strtok(pipecommand, "|");
-                while((token2[count]=strtok(NULL, "|")) != NULL) {
-             
-                    count++;
-                }
-                
-                
-                int i=0,j=0;
-                while (token2[i] == ' ') {
+void executePipeCommand(char *readline){
+
+        FILE *pipein;
+	FILE* pipeout[MAX_LENGTH];
+	int i, j, k, numOfCommands=0;
+	char readbuf[MAX_LENGTH];
+	char* cmd1;
+	char* cmd2[MAX_LENGTH];
+	
+	
+        //find number of pipe commands
+	cmd1 = strtok(readline, "|");
+	while((cmd2[numOfCommands]=strtok(NULL, "|")) != NULL) 
+	numOfCommands++;
+	
+	for(k=0;k< numOfCommands; k++) { 
+	i = 0;
+	while (cmd2[k][i] == ' ') {
 		j = 0;
-		while (token2[j]) {
-			token2[j] = token2[j + 1];
+		while (cmd2[k][j]) {
+			cmd2[k][j] = cmd2[k][j + 1];
 			j++;
 		}
 		i++;
 	}
-                
-                
-                
-                
-                
-                
-		/* create the pipe */
-		if (pipe(fd) == -1) {
-			printf("Pipe failed");
-		}
-		/* fork a child process */
-		pid = fork();
-		if (pid < 0) { 
-			printf("Fork Failed");
-			return 1;
-		}
-               printf("%s",token2[1]);
-                
+	}
+        
+        printf("%s",cmd2[1]);
+	
+	if ((pipein = popen(cmd1, "r")) == NULL) {
+		printf("Error executing command\n");
+		perror("popen");
+	    longjmp(getinput, 1);
+	}
+
+	i=0;
+	
+	if ((pipeout[i] = popen(cmd2[i], "w")) == NULL) {
+		printf("Error execting command\n");
+		perror("popen");
+		longjmp(getinput, 1);
+		
+	}
+	
+
+	while (fgets(readbuf, 80, pipein)) {
+	
+		fputs(readbuf, pipeout[i]);
+	} 
+	
+
+	pclose(pipein);
+        pclose(pipeout[i]);
+	
+	for(i=0;i<numOfCommands-1;i++) { 
+    	if ((pipeout[i] = popen(cmd2[i], "r")) == NULL) {
+		printf("Error executing command\n");
+		perror("popen");
+	    longjmp(getinput, 1);
+	}
+	
+	if ((pipeout[i+1] = popen(cmd2[i+1], "w")) == NULL) {
+		printf("Error execting command\n");
+		perror("popen");
+		longjmp(getinput, 1);
+		
+	}
+	
+    while (fgets(readbuf, MAX_LENGTH, pipeout[i])) {
+	
+		fputs(readbuf, pipeout[i+1]);
+	}
+    
+	pclose(pipeout[i]);
+	}
 
 
 }
 
+
 void ExecuteCommand(char *command){
-FILE *pipein_fp;
-FILE* pipeout_fp[256];
+
 
     if(fork()==0){
         
@@ -317,6 +356,55 @@ FILE* pipeout_fp[256];
 
     }
 }
+void ExecuteCommandWithArgs(char *command,char *argv[]){
+    pid_t pid;
+    pid=fork();
+    int k;
+    char *cmd=argv[0];
+  //  printf("%s",pid);
+       for(k=0;k<sizeof(argv)-1;k++){
+           argv[k]=argv[k+1];
+        }
+        
+           
+         char *args[64];
+        char **next = args;
+        
+        char *temp = strtok(command," ");
+        strcpy(cmd,temp);
+        int i=0;
+        while (temp != NULL)
+        {
+            temp = strtok(NULL, " ");
+            //*next++ = temp;
+           // printf("%s\n", temp);
+            args[i]=temp;
+            i++;
+            
+        }
+        args[i] = NULL;
+        
+        for(k=0;k<sizeof(args)-1;k++){
+            //printf("args %s",args[k]);
+        }
+        
+    if(pid>0){
+ 
+        int j= execvp(cmd, argv);
+        
+         if(j<0){
+        
+            printf("Some Error");
+            exit(1);
+        
+        }
+        else
+        {
+             wait(NULL);
+        }
+
+    }
+}
 void executeCdCommand(char *argv[]){
     
    
@@ -338,10 +426,7 @@ void executeCdCommand(char *argv[]){
     
     
 }
-void executePipeCommand(char *readline){
 
-
-}
 int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
@@ -358,7 +443,7 @@ int main(int argc, char *argv[], char *envp[])
 		}
 	else wait(NULL);
         
-            printf("\nWelcome to Custom Shell\n\n");
+        printf("\nWelcome to Custom Shell\n\n");
 	printf("Nikhileswar Gosala\n");
 	printf("Geetha Sankineni\n");
         printf("Harshitha Bandlam\n");
@@ -371,8 +456,8 @@ int main(int argc, char *argv[], char *envp[])
      //  printf("%s", PROMPT);
         
        while(1){
-         //  sleep(1);
-     printf("%s",PROMPT); 
+           sleep(1);
+                printf("%s",PROMPT); 
               gets(readline);
                  
                  // puts(readline);
@@ -397,23 +482,30 @@ int main(int argc, char *argv[], char *envp[])
 				int pid=createProcess();
                         printf("%d",pid);
                         }
-			else if (strstr(readline, "|") != NULL)
-				executePipeCommand(readline);
+			else if (strstr(readline, "|") != NULL){
+                            executePipeCommand(readline);
+                        }
+				
 			else if (strstr(readline,"cd")!=NULL)
                           {
                             parser(readline, argv);
                             executeCdCommand(argv);
                          }
                         
-                        else
+                        else{ 
+                             strcpy(temp,readline);
+                             parser(readline, argv);
+                             // printf("argv %s",argv[0]);
+                             if(argv[1]!=NULL){
+                             
+                                 ExecuteCommandWithArgs(temp,argv);
+                                 
+                             }
+                             else
                             ExecuteCommand(readline);
+                        }
 
-                        
-       
-                        	
-                        
-                    
-       
+
        }
 	 
 	 
