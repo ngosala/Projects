@@ -11,7 +11,7 @@
 
 
 // Declaration Section
-char *PROMPT;
+
 char *PATH;
 char *HOME;
 static char* args[10];
@@ -65,17 +65,6 @@ void InitialiseEnvironment(){
     PATH=strtok(pathstr,";.;");
    
      PATH=strstr(PATH,"/");
-     
- while(1){
-    pathstr=strstr(temp,"PROMPT");
-    break;
-    }
-     PROMPT=strtok(pathstr,";.;");
- 
-     PROMPT=strstr(PROMPT,"My");
-    
-    // getcwd(PROMPT,MAX_LENGTH);
-    // strcat(PROMPT,">");
 
     
   
@@ -431,15 +420,8 @@ void executecdCommand(char *argv[]){
     
    
     int changedir;
-    char *curwd;
-    getcwd(curwd,MAX_LENGTH);
-    changedir=chdir(curwd);
-    if(changedir!=0){
-        printf("couldnt change dir");
-    }
-   
-    
-  
+
+    printf("%s",argv[1]);
     changedir=chdir(argv[1]);
     if(changedir!=0){
         printf("couldnt change dir");
@@ -610,7 +592,7 @@ int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
     char temp[MAX_LENGTH];
-    PROMPT=NULL;
+    char *PROMPT;
 
         //clear the window
 	if(fork() == 0) {
@@ -633,18 +615,15 @@ int main(int argc, char *argv[], char *envp[])
         
        while(1){
            sleep(1);
-           getcwd(PROMPT,MAX_LENGTH);
-           strcat(PROMPT,">");
-              printf("\n%s",PROMPT); 
+PROMPT=getcwd(NULL, 0);
+  strcat(PROMPT,">");
+           printf("\n%s",PROMPT); 
+           
+         
+//printf("hello");
               gets(readline);
-             
-              //fgets(readline,MAX_LENGTH,stdin);
-                 
-              //    puts(readline);
-                        
+    
                  fflush(stdin);
-                  
-			//parser(readline, argv);
 
 			if (strcmp(argv[0], "exit") == 0) {
                             
