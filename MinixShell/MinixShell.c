@@ -6,12 +6,10 @@
 #include<setjmp.h>
 #include <signal.h>
 
-# define MAX_LENGTH 1024 // Buffer size for arrays or any other input
-
-
+# define MAX_LENGTH 128 // Buffer size for arrays or any other input
 
 // Declaration Section
-
+char *PROMPT;
 char *PATH;
 char *HOME;
 static char* args[10];
@@ -65,55 +63,13 @@ void InitialiseEnvironment(){
     PATH=strtok(pathstr,";.;");
    
      PATH=strstr(PATH,"/");
-
-    
-  
+     
     
     SetHomeDir(HOME);
     
  
 
 }
-
-// function to convert Uppser case to lower case
-
-char* Lower(char *temp){
-    
-    
-    int i;
-    for(i=0;temp[i]!='\0';i++){
-    
-    
-    if ((temp[i]>=65) && (temp[i]<=90)){
-        temp[i]=temp[i]+32;
-         }
-    
-  
-    
-     }
-    
-    return temp;
-    
-    }
-
-// function to convert lower case to upper
-char* Upper(char *temp){
-    
-    
-    int i;
-    for(i=0;temp[i]!='\0';i++){
-    
-      if ((temp[i]>=97) && (temp[i]<=122)){
-        temp[i]=temp[i]-32;
-        }
-     }
-    
-    return temp;
-    
-    }
-
-
-
 
 //Function to create New Process
 int createProcess(){
@@ -130,7 +86,8 @@ int createProcess(){
 void HandleSignal(int c){
 
     char response;
-    do{
+    signal(SIGINT, SIG_IGN);
+    while(response!='Y' && response!='N' && response!='y' && response!='n'){
     
         printf("\n Are you Sure You want to EXIT ? (Y/N)");
         fflush(stdin);
@@ -144,8 +101,6 @@ void HandleSignal(int c){
         else if (response=='N' || response=='n'){
         signal(SIGINT, HandleSignal);
         longjmp(getinput, 1);
-           // printf("Continue");
-           // printf("%s",PROMPT);
         
         }
         else{
@@ -153,9 +108,9 @@ void HandleSignal(int c){
             printf("Please provide valid response");
         
         }
-       // response==NULL;
+      
         
-    }while(response!='Y' && response!='N' && response!='y' && response!='n');
+    }
 
 }
 
@@ -183,7 +138,6 @@ void Redirect(char *cmd,char *argv[]){
        
         command=strtok(cmd,"=>");
         filename=strtok(NULL,"=>");
-      // printf("command%s123",filename);
 
 	// Open Pipe to redirect the command
 	if( ! (fpipe =(FILE *)popen(command, "r") ) )
@@ -210,15 +164,16 @@ void executePipecommand(char *readline){
 
         FILE *pipein;
 	FILE *pipeout[MAX_LENGTH];
-	int numOfCommands=0;
+	int numOfCommands=1;
 	char buffer[MAX_LENGTH];
-	char* cmd1;
+	char temp[MAX_LENGTH];
 	char* cmd2[MAX_LENGTH];
 	int i,j,k;
-	
+     
+        
         //find number of pipe commands
-	cmd1 = strtok(readline, "|");
-	while((cmd2[numOfCommands]=strtok(NULL, "|")) != NULL) 
+	cmd2[0] = strtok(readline, "$");
+	while((cmd2[numOfCommands]=strtok(NULL, "$")) != NULL) 
 	numOfCommands++;
 	
 	for(k=0;k< numOfCommands; k++) { 
@@ -232,7 +187,7 @@ void executePipecommand(char *readline){
 		i++;
 	}
 	}
-        pipein = popen(cmd1, "r");
+        pipein = popen(cmd2[numOfCommands-1], "r");
         if(pipein==NULL){
         
             printf("Pipe Failed");
@@ -241,7 +196,7 @@ void executePipecommand(char *readline){
         }
         
 	i=0;
-	pipeout[i] = popen(cmd2[i], "w");
+	pipeout[i] = popen(cmd2[numOfCommands-2], "w");
           if(pipeout[i]==NULL){
         
              printf("Pipe Failed");
@@ -256,7 +211,7 @@ void executePipecommand(char *readline){
 	pclose(pipein);
         pclose(pipeout[i]);
 	
-	for(i=0;i<numOfCommands-1;i++) { 
+	for(i=numOfCommands-2;i>0;i--) { 
        
         pipeout[i] = popen(cmd2[i], "r");
         
@@ -266,7 +221,7 @@ void executePipecommand(char *readline){
              longjmp(getinput, 1);   
         }
         
-	pipeout[i+1] = popen(cmd2[i+1], "w");
+	pipeout[i-1] = popen(cmd2[i-1], "w");
         
             if(pipeout[i+1]==NULL){
         
@@ -276,7 +231,7 @@ void executePipecommand(char *readline){
         
         while (fgets(buffer, MAX_LENGTH, pipeout[i])) {
 	
-		fputs(buffer, pipeout[i+1]);
+		fputs(buffer, pipeout[i-1]);
 	}
     
 	pclose(pipeout[i]);
@@ -313,7 +268,7 @@ void Executecommand(char *command){
 
     
 }
-
+/*
 void ExecuteDollar(char *readline){
 
         FILE *pipein;
@@ -397,9 +352,8 @@ void ExecutecommandWithArgs(char *command,char *argv[]){
 	char* cmd2;
 	int i,j,k;
 	
-        //find number of pipe commands
-	//cmd1 = argv[0];
-   
+        if(fork()==0)
+        {   
         pipein = popen(command, "r");
         if(pipein==NULL){
         
@@ -412,8 +366,10 @@ void ExecutecommandWithArgs(char *command,char *argv[]){
 		printf("%s",buffer);
 	} 
         //close pipes
+        
 	pclose(pipein);
         longjmp(getinput,1);
+        }
   
 }
 void executecdCommand(char *argv[]){
@@ -424,7 +380,7 @@ void executecdCommand(char *argv[]){
     printf("%s",argv[1]);
     changedir=chdir(argv[1]);
     if(changedir!=0){
-        printf("couldnt change dir");
+        printf("couldnt change dircd");
     }
     
     
@@ -464,7 +420,12 @@ void executeCalcCommand(char *readline){
     if(strstr(temp,"+")!=NULL){
         var4=(strtok(temp,"+"));
         var5=(strtok(NULL,"+"));
-        
+        if(strstr(var4,"$")){
+            var4++;
+        }
+        if(strstr(var5,"$")){
+            var5++;
+        }
         if((buff=getenv(var4))!=NULL){
         var1=atoi(buff);
         }
@@ -485,7 +446,12 @@ void executeCalcCommand(char *readline){
     else if(strstr(temp,"-")!=NULL){
           var4=(strtok(temp,"-"));
         var5=(strtok(NULL,"-"));
-        
+          if(strstr(var4,"$")){
+            var4++;
+        }
+        if(strstr(var5,"$")){
+            var5++;
+        }
         if((buff=getenv(var4))!=NULL){
         var1=atoi(buff);
         }
@@ -506,7 +472,12 @@ void executeCalcCommand(char *readline){
     
             var4=(strtok(temp,"*"));
         var5=(strtok(NULL,"*"));
-        
+          if(strstr(var4,"$")){
+            var4++;
+        }
+        if(strstr(var5,"$")){
+            var5++;
+        }
         if((buff=getenv(var4))!=NULL){
         var1=atoi(buff);
         }
@@ -527,7 +498,12 @@ void executeCalcCommand(char *readline){
     
              var4=(strtok(temp,"/"));
         var5=(strtok(NULL,"/"));
-        
+          if(strstr(var4,"$")){
+            var4++;
+        }
+        if(strstr(var5,"$")){
+            var5++;
+        }
         if((buff=getenv(var4))!=NULL){
         var1=atoi(buff);
         }
@@ -548,7 +524,12 @@ void executeCalcCommand(char *readline){
     
            var4=(strtok(temp,"%"));
         var5=(strtok(NULL,"%"));
-        
+          if(strstr(var4,"$")){
+            var4++;
+        }
+        if(strstr(var5,"$")){
+            var5++;
+        }
         if((buff=getenv(var4))!=NULL){
         var1=atoi(buff);
         }
@@ -565,12 +546,7 @@ void executeCalcCommand(char *readline){
         res=(var1%var2);
         printf("%d",res);
     }
-   // if(var3!=NULL){
-    
-     //   setenv(var3,res,0);
-    
-   // }
-    
+ 
     
     
 
@@ -588,11 +564,25 @@ void executeechoCommand(char *command){
     buffer=getenv(token2);
     printf("\n%s",buffer);
 }
+void executeechoCommandForVar(char *command){
+
+    char *token1;
+    char *token2;
+    char *buffer;
+    char *temp;
+    int i;
+    token2=command;
+    token2++;
+    buffer=getenv(token2);
+    printf("\n%s",buffer);
+}
 int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
     char temp[MAX_LENGTH];
-    char *PROMPT;
+    char *buff;
+    PROMPT=NULL;
+    int count=0;
 
         //clear the window
 	if(fork() == 0) {
@@ -607,20 +597,17 @@ int main(int argc, char *argv[], char *envp[])
         printf("Harshitha Bandlamudi\n");
     
         InitialiseEnvironment();
+        
         setjmp(getinput);
         
-       signal(SIGINT,HandleSignal);
+        signal(SIGINT,HandleSignal);
         
-     //  printf("%s", PROMPT);
         
        while(1){
            sleep(1);
-PROMPT=getcwd(NULL, 0);
-  strcat(PROMPT,">");
-           printf("\n%s",PROMPT); 
-           
-         
-//printf("hello");
+           PROMPT=getcwd(NULL, 0);
+           strcat(PROMPT,">");
+              printf("\n%s",PROMPT); 
               gets(readline);
     
                  fflush(stdin);
@@ -641,17 +628,39 @@ PROMPT=getcwd(NULL, 0);
 				int pid=createProcess();
                                 printf("%d",pid);
                         }
-			else if (strstr(readline, "|") != NULL){
-                            executePipecommand(readline);
-                        }
                           else if(strstr(readline,"echo")!=NULL){
                         
                             executeechoCommand(readline);
 
                         }
+                   
                         else if (strstr(readline, "$") != NULL){
-                            ExecuteDollar(readline);
+                            int i;
+                            strcpy(temp,readline);
+                            buff=strtok(temp,"$");
+                            while((strtok(NULL,"$"))){
+                                count++;
+                            }
+                        
+                            if(!(strncmp("$",readline,1)) && count==0){
+                                
+                                if(((strstr(readline,"+") || strstr(readline,"-") ||strstr(readline,"*") ||strstr(readline,"/") ||strstr(readline,"%"))&& strstr(readline,"$")!=NULL)){
+                                executeCalcCommand(readline);
+                                }
+                                else{
+                                
+                                executeechoCommandForVar(temp);
+                                }
+                                
+                             
+                            }
+                            else{
+                            //ExecuteDollar(readline);
+                                 executePipecommand(readline);
+                            }
+                            
                         }
+                 
 				
 			else if (strstr(readline,"cd")!=NULL)
                           {
@@ -662,10 +671,7 @@ PROMPT=getcwd(NULL, 0);
                         
                             executeSetEnvCommand(readline);
                         }
-                        else if((strstr(readline,"+") || strstr(readline,"-") ||strstr(readline,"*") ||strstr(readline,"/") ||strstr(readline,"%")!=NULL)){
-                        
-                           executeCalcCommand(readline);
-                        }
+                     
                         else{ 
                              strcpy(temp,readline);
                              parser(readline, argv);
@@ -674,13 +680,14 @@ PROMPT=getcwd(NULL, 0);
                                  ExecutecommandWithArgs(temp,argv);
                                  
                              }
+                             
                              else
                             Executecommand(readline);
                         }
 
 
        }
-       free(argv);
+       
 	 
 	 
 }
