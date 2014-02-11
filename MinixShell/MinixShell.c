@@ -392,7 +392,9 @@ void executeSetEnvCommand(char *readline){
     char *constant1;
     var1=strtok(readline,"=");
     constant1=strtok(NULL,"=");
-    setenv(var1,constant1,0);
+    setenv(var1,constant1,1);
+   
+    longjmp(getinput,1);
 
 
 }
@@ -547,7 +549,7 @@ void executeCalcCommand(char *readline){
         printf("%d",res);
     }
  
-    
+    longjmp(getinput,1);
     
 
 }
@@ -641,13 +643,14 @@ int main(int argc, char *argv[], char *envp[])
                             while((strtok(NULL,"$"))){
                                 count++;
                             }
-                        
-                            if(!(strncmp("$",readline,1)) && count==0){
+                            parser(temp,argv);
+                            
+                            if(!(strncmp("$",readline,1)) && sizeof(argv)<=8 && count<2){
                                 
                                 if(((strstr(readline,"+") || strstr(readline,"-") ||strstr(readline,"*") ||strstr(readline,"/") ||strstr(readline,"%"))&& strstr(readline,"$")!=NULL)){
                                 executeCalcCommand(readline);
                                 }
-                                else{
+                                else {
                                 
                                 executeechoCommandForVar(temp);
                                 }
