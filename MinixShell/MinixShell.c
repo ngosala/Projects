@@ -6,7 +6,7 @@
 #include<setjmp.h>
 #include <signal.h>
 
-# define MAX_LENGTH 128 // Buffer size for arrays or any other input
+# define MAX_LENGTH 128 // Buffer size 
 
 // Declaration Section
 char *PROMPT;
@@ -115,16 +115,15 @@ void HandleSignal(int i){
 
 }
 
-/* Function to parse the input command */
 
 void parser(char *readline, char**argv) {
     
 	while (*readline != '\0') {
-		while (*readline == ' ' || *readline == '\t' || *readline == '\n')
-			*readline++ = '\0';
+		while ( *readline == '\t' || *readline == ' ' || *readline == '\n')
+			*readline++ = '\0'; //advance pointer
 		*argv++ = readline;
-		while (*readline != '\0' && *readline != ' ' && *readline != '\t' && *readline != '\n')
-			readline++;
+		while (*readline != '\t' && *readline != '\0' && *readline != '\n' && *readline != ' ')
+			readline++; //advance to next char
 	}
 	*argv = '\0';
 }
@@ -144,7 +143,7 @@ void Redirect(char *cmd,char *argv[]){
 	if( ! (fpipe =(FILE *)popen(command, "r") ) )
 	{
 		printf("Unable to execute the command !\n");
-		exit(1);
+		exit(0);
 	}
 
 	
@@ -159,6 +158,7 @@ void Redirect(char *cmd,char *argv[]){
 
 	pclose(fpipe);
 	fclose(outfile);
+	longjmp(env, 1);
 }
 
 void executePipecommand(char *readline){
