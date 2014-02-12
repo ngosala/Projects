@@ -17,13 +17,12 @@ static char* args[10];
 jmp_buf (getinput);
 
 // Set Home directory
-
 void SetHomeDir(char *HomeDir){
-int errno=0;
     int changedir;
     changedir=chdir(HomeDir);
+    setenv(HOME,HomeDir,1);
     if(changedir!=0){
-        printf("\nError while Setting Home Directory :%s\n",strerror(errno));
+        printf("\nError Setting Home Directory\n");
 
     }
   
@@ -83,7 +82,7 @@ int createProcess(){
 
 // Signal Handler
 
-void HandleSignal(int c){
+void HandleSignal(int i){
 
     char response;
     signal(SIGINT, SIG_IGN);
@@ -105,7 +104,7 @@ void HandleSignal(int c){
         }
         else{
         
-            printf("Please provide valid response");
+            printf("\nPlease provide valid response");
         
         }
       
@@ -253,7 +252,7 @@ void Executecommand(char *command){
         
          if(i<0){
         
-            printf("Error Processing Command");
+            printf("Error Processing Command or invalid Command");
             exit(1);
         
         }
@@ -264,13 +263,12 @@ void Executecommand(char *command){
 
         }
     
-
+    longjmp(getinput,1);
 
     
 }
-/*
-void ExecuteDollar(char *readline){
 
+void ExecutecommandWithArgs(char *command,char *argv[]){
         FILE *pipein;
 	FILE *pipeout;
 	int numOfCommands=0;
@@ -279,86 +277,12 @@ void ExecuteDollar(char *readline){
 	char* cmd2;
 	int i,j,k;
 	
-        //find number of pipe commands
-	cmd1 = strtok(readline, "$");
-        cmd2 = strtok(NULL,"$");
-        pipein = popen(cmd2, "r");
-        if(pipein==NULL){
-        
-            printf("Pipe Failed");
-             longjmp(getinput, 1);
-            
-        }
-        
-	i=0;
-	pipeout = popen(cmd1, "w");
-          if(pipeout==NULL){
-        
-             printf("Pipe Failed");
-             longjmp(getinput, 1);   
-        }
-
-	while (fgets(buffer, MAX_LENGTH, pipein)) {
-	
-		fputs(buffer, pipeout);
-	} 
-        //close pipes
-	pclose(pipein);
-        pclose(pipeout);
-         longjmp(getinput,1);
-}
-/*
-void ExecutecommandWithArgs(char *command,char *argv[]){
-    pid_t pid;
-    pid=fork();
-    int k;
-    char *cmd=argv[0];
-  
-       for(k=0;k<sizeof(argv)-1;k++){
-             
-           argv[k]=argv[k+1];
-           printf("ar %s",argv[k]);
-        }
-
-       
-      
-    if(pid>0){
- 
-        int j= execvp(cmd, argv);
-        
-         if(j<0){
-        
-            printf("Some Error");
-            exit(1);
-        
-        }
-        else
-        {
-             wait(NULL);
-        }
-
-    }
-        longjmp(getinput,1);
-  
-}
- */
-
-void ExecutecommandWithArgs(char *command,char *argv[]){
-    FILE *pipein;
-	FILE *pipeout;
-	int numOfCommands=0;
-	char buffer[MAX_LENGTH];
-	char* cmd1;
-	char* cmd2;
-	int i,j,k;
-	
-        if(fork()==0)
-        {   
+         
         pipein = popen(command, "r");
         if(pipein==NULL){
         
             printf("Error in Command");
-             longjmp(getinput, 1);
+            // longjmp(getinput, 1);
             
         }
 	while (fgets(buffer, MAX_LENGTH, pipein)) {
@@ -369,21 +293,17 @@ void ExecutecommandWithArgs(char *command,char *argv[]){
         
 	pclose(pipein);
         longjmp(getinput,1);
-        }
-  
+        
 }
 void executecdCommand(char *argv[]){
     
-   
     int changedir;
-
-    printf("%s",argv[1]);
     changedir=chdir(argv[1]);
     if(changedir!=0){
-        printf("couldnt change dircd");
+         printf("Error Changing Directory or Invalid Directory\n");
     }
     
-    
+    longjmp(getinput,1);
     
 }
 void executeSetEnvCommand(char *readline){
@@ -392,8 +312,10 @@ void executeSetEnvCommand(char *readline){
     char *constant1;
     var1=strtok(readline,"=");
     constant1=strtok(NULL,"=");
-    setenv(var1,constant1,1);
-   
+   int i= setenv(var1,constant1,1);
+   if(i!=0){
+       printf("Error Setting Environment Variable");
+   }
     longjmp(getinput,1);
 
 
@@ -564,7 +486,14 @@ void executeechoCommand(char *command){
     token2=strtok(NULL," ");
     token2++;
     buffer=getenv(token2);
-    printf("\n%s",buffer);
+    if(buffer!=NULL){
+    printf("\n%s\n",buffer);
+    }
+    else{
+    
+        printf("Cannot read value");
+    }
+    longjmp(getinput,1);
 }
 void executeechoCommandForVar(char *command){
 
@@ -582,7 +511,8 @@ int main(int argc, char *argv[], char *envp[])
 {
     char readline[MAX_LENGTH];
     char temp[MAX_LENGTH];
-    char *buff;
+    char *buff1;
+    char *buff2;
     PROMPT=NULL;
     int count=0;
 
@@ -599,20 +529,21 @@ int main(int argc, char *argv[], char *envp[])
         printf("Harshitha Bandlamudi\n");
     
         InitialiseEnvironment();
-        
-        setjmp(getinput);
+  
         
         signal(SIGINT,HandleSignal);
         
-        
+        setjmp(getinput);
        while(1){
            sleep(1);
-           PROMPT=getcwd(NULL, 0);
+         PROMPT=getcwd(NULL, 0);
            strcat(PROMPT,">");
-              printf("\n%s",PROMPT); 
+              printf("\n%s",PROMPT);
+              fflush(stdin);
+            //  gets_s(readline,MAX_LENGTH);
               gets(readline);
-    
-                 fflush(stdin);
+             // fgets(readline,MAX_LENGTH,NULL);
+                 
 
 			if (strcmp(argv[0], "exit") == 0) {
                             
@@ -636,26 +567,25 @@ int main(int argc, char *argv[], char *envp[])
 
                         }
                    
-                        else if (strstr(readline, "$") != NULL){
+                        else if (strstr(readline, "$") != NULL || strstr(readline,"calc")!=NULL){
                             int i;
                             strcpy(temp,readline);
-                            buff=strtok(temp,"$");
+                            buff1=strtok(temp,"$");
                             while((strtok(NULL,"$"))){
                                 count++;
                             }
-                            parser(temp,argv);
+                           // parser(temp,argv);
                             
-                            if(!(strncmp("$",readline,1)) && sizeof(argv)<=8 && count<2){
+                            if(strstr(readline,"calc")!=NULL){
+                                   buff2=strtok(readline," ");
+                                   buff2=strtok(NULL," ");
+                         
                                 
-                                if(((strstr(readline,"+") || strstr(readline,"-") ||strstr(readline,"*") ||strstr(readline,"/") ||strstr(readline,"%"))&& strstr(readline,"$")!=NULL)){
-                                executeCalcCommand(readline);
-                                }
-                                else {
-                                
-                                executeechoCommandForVar(temp);
-                                }
-                                
-                             
+                                executeCalcCommand(buff2);
+
+                            }
+                            if(!(strncmp("$",readline,1)) && count<2){
+                             executeechoCommandForVar(temp);
                             }
                             else{
                             //ExecuteDollar(readline);
@@ -665,7 +595,7 @@ int main(int argc, char *argv[], char *envp[])
                         }
                  
 				
-			else if (strstr(readline,"cd")!=NULL)
+			else if (!strncmp(readline,"cd",2))
                           {
                             parser(readline, argv);
                             executecdCommand(argv);
