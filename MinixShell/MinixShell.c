@@ -330,14 +330,16 @@ void executeCalcCommand(char *readline){
     char *temp;
     char *buff;
     int res;
+    char *result;
     if((strstr(readline,"="))!=NULL){
     
       var3=strtok(readline,"=");
       temp=strtok(NULL,"=");
+      printf("%s",var3);
         
     }
     else{
-    
+        var3=NULL;
         temp=readline;
     
     }
@@ -365,6 +367,8 @@ void executeCalcCommand(char *readline){
        
         res=(var1+var2);
         printf("%d",res);
+     
+        
     
     }
     else if(strstr(temp,"-")!=NULL){
@@ -391,6 +395,7 @@ void executeCalcCommand(char *readline){
        
         res=(var1-var2);
         printf("%d",res);
+      
     }
     else if(strstr(temp,"*")!=NULL){
     
@@ -417,6 +422,7 @@ void executeCalcCommand(char *readline){
        
         res=(var1*var2);
         printf("%d",res);
+         
     }
     else if(strstr(temp,"/")!=NULL){
     
@@ -443,6 +449,7 @@ void executeCalcCommand(char *readline){
        
         res=(var1/var2);
         printf("%d",res);
+       
     }
     else if(strstr(temp,"%")!=NULL){
     
@@ -469,6 +476,7 @@ void executeCalcCommand(char *readline){
        
         res=(var1%var2);
         printf("%d",res);
+       
     }
  
     longjmp(getinput,1);
@@ -505,7 +513,14 @@ void executeechoCommandForVar(char *command){
     token2=command;
     token2++;
     buffer=getenv(token2);
-    printf("\n%s",buffer);
+       if(buffer!=NULL){
+    printf("\n%s\n",buffer);
+    }
+    else{
+    
+        printf("Cannot read value");
+    }
+    longjmp(getinput,1);
 }
 int main(int argc, char *argv[], char *envp[])
 {
@@ -530,19 +545,18 @@ int main(int argc, char *argv[], char *envp[])
     
         InitialiseEnvironment();
   
-        
+        setjmp(getinput);
         signal(SIGINT,HandleSignal);
         
-        setjmp(getinput);
+        
        while(1){
            sleep(1);
          PROMPT=getcwd(NULL, 0);
            strcat(PROMPT,">");
               printf("\n%s",PROMPT);
               fflush(stdin);
-            //  gets_s(readline,MAX_LENGTH);
-              gets(readline);
-             // fgets(readline,MAX_LENGTH,NULL);
+             // gets(readline);
+              fgets(readline,MAX_LENGTH,stdin);
                  
 
 			if (strcmp(argv[0], "exit") == 0) {
