@@ -560,15 +560,26 @@ int main(int argc, char *argv[], char *envp[])
               fflush(stdin);
               gets(readline);
             //  fgets(readline,MAX_LENGTH,stdin);
-                 
+                         if ((strstr(readline, "=>") != NULL) && (strstr(readline, "$") != NULL)){
+                  
+                              char *tmp1;
+                              char *tmp2;
+                              char *tmp3;
+                              tmp1=strtok(readline,"=");
+                              tmp2=strtok(NULL,"=");
+
+                              tmp3=strcat(tmp1,tmp2);
+                              memcpy(readline,tmp3,sizeof(tmp3));
+
+              
+                           }
 
 			if (strcmp(readline, "exit") == 0) {
                             
 				printf("\n GoodBye...\n");
 				exit(0);
 			}
-                       
-                        
+
 			else 			
 			if (strstr(readline, "=>") != NULL) {
                             strcpy(temp,readline);
@@ -592,7 +603,6 @@ int main(int argc, char *argv[], char *envp[])
                             while((strtok(NULL,"$"))){
                                 count++;
                             }
-                           // parser(temp,argv);
                             
                             if(strstr(readline,"calc")!=NULL){
                                    buff2=strtok(readline," ");
