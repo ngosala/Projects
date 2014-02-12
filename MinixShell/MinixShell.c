@@ -10,8 +10,8 @@
 
 // Declaration Section
 char *PROMPT;
-char *PATH;
-char *HOME;
+char *PATHVAR;
+char *HOMEVAR;
 static char* args[10];
 
 jmp_buf (getinput);
@@ -20,7 +20,7 @@ jmp_buf (getinput);
 void SetHomeDir(char *HomeDir){
     int changedir;
     changedir=chdir(HomeDir);
-    setenv(HOME,HomeDir,1);
+  setenv("HOME",HomeDir,1);
     if(changedir!=0){
         printf("\nError Setting Home Directory\n");
 
@@ -44,27 +44,29 @@ void InitialiseEnvironment(){
 
     }
     fclose(fptr);
-    // Reading HOME value
+    // Reading HOMEVAR value
        while(1){
     pathstr=strstr(temp,"HOME");
     break;
     }
    
-    HOME=strtok(pathstr,"\n");
+    HOMEVAR=strtok(pathstr,"\n");
   
-    HOME=strstr(HOME,"/");
+    HOMEVAR=strstr(HOMEVAR,"/");
 
      // Reading Path value
     while(1){
     pathstr=strstr(temp,"PATH");
     break;
     }
-    PATH=strtok(pathstr,";.;");
+    PATHVAR=strtok(pathstr,";.;");
    
-     PATH=strstr(PATH,"/");
+     PATHVAR=strstr(PATHVAR,"/");
      
+      setenv("PATH",PATHVAR,1);
+ 
     
-    SetHomeDir(HOME);
+    SetHomeDir(HOMEVAR);
     
  
 
@@ -544,7 +546,7 @@ int main(int argc, char *argv[], char *envp[])
         printf("Harshitha Bandlamudi\n");
     
         InitialiseEnvironment();
-  
+        fflush(stdin);
         setjmp(getinput);
         signal(SIGINT,HandleSignal);
         
@@ -555,11 +557,11 @@ int main(int argc, char *argv[], char *envp[])
            strcat(PROMPT,">");
               printf("\n%s",PROMPT);
               fflush(stdin);
-             // gets(readline);
-              fgets(readline,MAX_LENGTH,stdin);
+              gets(readline);
+            //  fgets(readline,MAX_LENGTH,stdin);
                  
 
-			if (strcmp(argv[0], "exit") == 0) {
+			if (strcmp(readline, "exit") == 0) {
                             
 				printf("\n GoodBye...\n");
 				exit(0);
@@ -598,7 +600,7 @@ int main(int argc, char *argv[], char *envp[])
                                 executeCalcCommand(buff2);
 
                             }
-                            if(!(strncmp("$",readline,1)) && count<2){
+                            if(strstr(readline, "$") && (count<2)){
                              executeechoCommandForVar(temp);
                             }
                             else{
