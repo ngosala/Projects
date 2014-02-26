@@ -1,0 +1,993 @@
+
+#include "storage_mgr.h"
+#include<string.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<stdbool.h>
+#include <time.h>
+#include "buffer_mgr.h"
+#include "buffer_mgr_stat.h"
+#include "dberror.h"
+
+struct buffer_LRU {
+    int pos;
+    int pageNum;
+    int fixCount;
+    bool dirty;
+    void *timestamp;
+    int age;
+    char *data;
+    //int readIO;
+    //int writeIO;
+    struct BM_PageHandle *pHandle;
+    struct buffer_LRU *next;
+} *start_lru = NULL;
+
+struct buffer_Queue {
+    int pos;
+    int pageNum;
+    int fixCount;
+    bool dirty;
+    char *data;
+    //struct BM_PageHandle *pHandle;
+    struct buffer_Queue *next;
+} *strt_fifo = NULL, *rear_fifo = NULL;
+
+typedef struct buffer_pool_stat {
+    int readIO ;
+    int writeIO ;
+    PageNumber *pageNumber_stat;
+    int *fixCounts_stat;
+    bool *dirtyPages_stat;
+} buffer_pool_stat;
+
+typedef struct buffer_stat {
+    void *buf;
+    struct buffer_pool_stat *pool_Stat;
+    SM_FileHandle *fh;
+} buffer_stat;
+//LRU Page replacement methods
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Calculate Length of Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int lengthofBuffer() {
+    struct buffer_LRU *root;
+    root= start_lru;
+    int count = 0;
+    while (root != NULL) {
+        count++;
+        root = root->next;
+    }
+    return count;
+}
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Add Data to Buffer
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC addDataToBuffer(BM_BufferPool * const bm, BM_PageHandle * const page, int pos) {
+
+    int i;
+    struct buffer_LRU *temp1;
+    struct buffer_LRU *temp2, *root;
+    struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+     stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+     pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+     stat=bm->mgmtData;
+    pool_stat = stat->pool_Stat;
+    root = stat->buf;
+
+    if (pos > (lengthofBuffer(bm) + 1) || pos <= 0) {
+        RC_FILE_CUR_POS_ERROR;
+    } else {
+
+        if (pos == 1) {
+
+            temp1 = (struct buffer_LRU *) malloc(sizeof (struct buffer_LRU));
+            //  temp1->buff=data;
+            temp1->pHandle=page;
+            
+            temp1->pos = 1;
+            start_lru = temp1;
+            start_lru->next = NULL;
+
+            //addAtBegin(data);
+        } else {
+            /*
+            for (i = 1; i < pos; i++) {
+                temp2 = root;
+                root = root->next;
+            }
+*/
+            
+            temp1 = (struct buffer_LRU *) malloc(sizeof (struct buffer_LRU));
+            // temp1->buff=data;
+            temp1->pHandle=page;
+            temp1->pos=pos;
+            temp1->timestamp = clock();
+            temp2->next = temp1;
+            temp1->next = root;
+        }
+
+      //  bm->mgmtData = temp1;
+       // start_lru=temp1;
+        start_lru->next=temp1;
+
+    }
+	return RC_OK;
+
+}
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Delete element in Buffer
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC deleteFrameInBuffer(int pos) {
+    struct buffer_LRU *temp1, *temp2;
+    int i;
+
+    temp2 = start_lru;
+
+    if (pos > (lengthofBuffer()) || pos < 0) {
+       return RC_BUFFER_DEL_ERROR;
+    } 
+    
+    else {
+        
+        while(temp2!=NULL)
+    {
+    if(temp2->pos==pos)
+    {
+        if(temp2==start_lru)
+        {
+        start_lru=temp2->next;
+        free(temp2);
+        }
+        else
+        {
+        temp1->next=temp2->next;
+        free(temp2);
+        }
+    }
+    else
+    {
+        temp1=temp2;
+        temp2= temp2->next;
+    }
+    }
+        
+
+    }
+
+}
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Search for Frame
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int searchForFrame(PageNumber pNum) {
+    int flag = -1;
+    struct buffer_LRU *temp;
+    temp=start_lru;
+    while (temp != NULL) {
+        if (temp->pageNum == pNum){
+            flag = temp->pos;
+            break;
+        }
+        temp = temp->next;
+    }
+
+    return flag;
+}
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: LRU algorithm
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int LRU() {
+
+    struct buffer_LRU *temp;
+    temp= start_lru;
+    int pos;
+    int max;
+       max=temp->age; //Sets max to first value
+       pos=temp->pos;
+    while(temp != NULL)
+    {
+        if(temp->age>max){
+            max=temp->age;
+            pos=temp->pos;
+        }
+        temp=temp->next;
+    }
+    return pos;
+}
+
+//FIFO Page replacement methods
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Length of Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int len_fifo_buffer() {
+    struct buffer_Queue *temp;
+    int count = 0;
+    temp = (struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    temp = strt_fifo;
+    while (temp != NULL) {
+        count++;
+        temp = temp->next;
+    }
+    return count;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Insert new frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC insert_frame_fifo_buffer(BM_BufferPool * const bm, BM_PageHandle * const page) {
+      int cur_buffer_size;
+    int isPagePresent;
+    struct buffer_stat *stat;
+    struct buffer_Queue *temp, *temp1;
+    struct buffer_pool_stat *pool_stat;
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    temp = (struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    stat = bm->mgmtData;
+    pool_stat = stat->pool_Stat;
+    temp->data=(char * )malloc (PAGE_SIZE);
+    //If the Page Frame is empty
+    if (strt_fifo == NULL && rear_fifo == NULL) {
+        
+        temp->pos = 0;
+        temp->dirty = false;
+        temp->fixCount = 1;
+        memcpy(temp->data,page->data,PAGE_SIZE);
+       // temp->data=page->data;
+        temp->pageNum = page->pageNum;
+        rear_fifo = temp;
+        strt_fifo = temp;
+        strt_fifo->next = rear_fifo;
+        rear_fifo->next = NULL;
+        pool_stat->pageNumber_stat[0] = temp->pageNum;
+    } else {
+        cur_buffer_size = len_fifo_buffer();
+        isPagePresent = search_frame_fifo_buffer(page->pageNum);
+        //if the requested pageNum is not present in the frame
+        if (isPagePresent>-1 && isPagePresent <= bm->numPages) {
+            update_frame_stat_fifo_buffer(strt_fifo, stat, UP_Pin, isPagePresent);
+
+        }//if the requested pageFrame is present in the frame
+        else {
+
+            if (bm->numPages == cur_buffer_size) {
+
+                temp1 = strt_fifo->next;
+                writeBlock(strt_fifo->pageNum,stat->fh,strt_fifo->data);
+                free(strt_fifo);
+                strt_fifo = temp1;
+                temp->next = NULL;
+                temp->pos = rear_fifo->pos + 1;
+                temp->dirty = false;
+                temp->fixCount = 1;
+                memcpy(temp->data,page->data,PAGE_SIZE);
+                //temp->data=page->data;
+                temp->pageNum = page->pageNum;
+                rear_fifo->next = temp;
+                rear_fifo = temp;
+                updateFramePosition(stat);
+            }// else add the new pageNum at the end
+            else {
+                temp->next = NULL;
+                temp->pos = rear_fifo->pos + 1;
+                temp->dirty = false;
+                temp->fixCount = 1;
+                memcpy(temp->data,page->data,PAGE_SIZE);
+                //temp->data=page->data;
+                temp->pageNum = page->pageNum;
+                rear_fifo->next = temp;
+                rear_fifo = temp;
+                pool_stat->pageNumber_stat[temp->pos] = temp->pageNum;
+            }
+        }
+    }
+    return RC_OK;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int search_frame_fifo_buffer(PageNumber pNum) {
+    struct buffer_Queue *temp;
+    int pos = -1;
+    temp = (struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    temp = strt_fifo;
+    while (temp != NULL) {
+        if (temp->pageNum == pNum) {
+            pos = temp->pos;
+            break;
+        }
+        temp = temp->next;
+    }
+    return pos;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC update_frame_stat_fifo_buffer(struct buffer_Queue *buf, struct buffer_stat *stat, UpdateFrameData update_value, int pos) {
+    struct buffer_pool_stat *pool_stat;
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    pool_stat = stat->pool_Stat;
+    while (buf != NULL) {
+        if (buf->pos == pos) {
+            switch (update_value) {
+                case(UP_Dirty):
+                    buf->dirty = true;
+                    pool_stat->dirtyPages_stat[pos] = buf->dirty;
+                    break;
+                case(UP_Pin):
+                    buf->fixCount = buf->fixCount + 1;
+                    pool_stat->fixCounts_stat[pos] = buf->fixCount;
+                    break;
+                case(UP_Unpin):
+                    buf->fixCount = buf->fixCount - 1;
+                    pool_stat->fixCounts_stat[pos] = buf->fixCount;
+                    break;
+                case(UP_NOT_Dirty):
+                    buf->dirty = false;
+                    pool_stat->dirtyPages_stat[pos] = buf->dirty;
+                    break;
+
+            }
+        }
+        buf = buf->next;
+    }
+    return RC_OK;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+void updateFramePosition(struct buffer_stat *stat) {
+    struct buffer_pool_stat *pool_stat;
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    pool_stat = stat->pool_Stat;
+    int pos = -1;
+    struct buffer_Queue *temp;
+    temp = (struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    temp = strt_fifo;
+    while (temp != NULL) {
+        pos = pos + 1;
+        temp->pos = pos;
+        pool_stat->pageNumber_stat[pos] = temp->pageNum;
+        temp = temp->next;
+    }
+}
+
+// Buffer Manager Interface Pool Handling
+
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Initialise Buffer Pool
+ * INPUT: Buffer POOL;PAGE FRAME;BUFFER SIZE;REPLACEMENT STRATEGY;STRAT DATA
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC initBufferPool(BM_BufferPool * const bm, const char *const pageFileName, const int numPages, ReplacementStrategy strategy, void* stratData) {
+    SM_FileHandle *fh=(SM_FileHandle *)malloc(PAGE_SIZE);
+    struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+    struct buffer_Queue *temp, *temp1;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    temp = (struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    pool_stat->dirtyPages_stat = (bool *) malloc(numPages*sizeof (bool));
+    pool_stat->fixCounts_stat = (int *) malloc(numPages*sizeof (int));
+    pool_stat->pageNumber_stat = (PageNumber *) malloc(numPages*sizeof (PageNumber));
+    //pool_stat->pageNumber_stat=NO_PAGE;
+    pool_stat->readIO=0;
+    pool_stat->writeIO=0;
+    bm->pageFile = (char *) pageFileName;
+    bm->numPages = numPages;
+    bm->strategy = strategy;
+    bm->mgmtData = stat;
+    openPageFile(bm->pageFile,fh);
+    switch (strategy) {
+        case RS_FIFO:
+            stat->fh = fh;
+            stat->buf = strt_fifo;
+            stat->pool_Stat = pool_stat;
+            break;
+        case RS_LRU:
+            stat->fh = fh;
+            stat->buf = start_lru;
+            stat->pool_Stat = pool_stat;
+            break;
+        case RS_CLOCK:
+            //printf("CLOCK");
+            break;
+        case RS_LFU:
+            //printf("LFU");
+            break;
+        case RS_LRU_K:
+            //printf("LRU-K");
+            break;
+        default:
+            return RC_BUFFER_UNDEFINED_STRATEGY;
+    }
+    return RC_OK;
+}
+
+/*
+ * AUTHOR: Sindhu
+ * METHOD: shutdownBufferPool
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC shutdownBufferPool(BM_BufferPool * const bm) {
+
+	struct buffer_stat *stat;
+	stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+	stat = bm->mgmtData;
+	SM_FileHandle fh;
+    int pos=0;
+    int numofPages = bm->numPages;
+    struct buffer_pool_stat *pool_stat;
+    pool_stat = stat->pool_Stat;
+    for(pos=0;pos<numofPages;++pos){
+    	 if(pool_stat[pos].dirtyPages_stat){
+        	// writeBlock(pos, stat->fh, stat->buf);
+        }
+    }
+    free(bm);
+    return RC_OK;
+}
+
+
+/*
+ * AUTHOR: Sindhu
+ * METHOD: forceFlushPool
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+
+RC forceFlushPool(BM_BufferPool * const bm) {
+
+	struct buffer_stat *stat;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    stat = bm->mgmtData;
+  	int numberofPages = bm->numPages;
+  	int pos;
+     for(pos=0;pos<numberofPages;++pos){
+    	 writeBlock(pos,stat->fh,stat->buf);
+    }
+    return RC_OK;
+}
+
+RC increment_age(){
+ struct buffer_LRU *root;
+    root= start_lru;
+    while (root != NULL) {
+        root->age=root->age+1;
+        root = root->next;
+    }
+ 
+}
+/*
+void display(){
+ struct buffer_LRU *root;
+    root= start_lru;
+    int i=1;
+    while(root!=NULL)
+    {
+        printf("Node %d",i);
+        int node=i;
+        int pos=root->pos;
+        int age=root->age;
+    printf(" %d",root->pos);   
+    printf(" %d",root->age);
+    i++;
+    root=root->next;
+    }
+}
+*/
+int maxpos(){
+    
+      struct buffer_LRU *temp;
+    temp= start_lru;
+    int pos;
+    int max;
+       max=temp->pos; //Sets max to first value
+    while(temp!= NULL)
+    {
+        if(temp->pos>max){
+            max=temp->pos;
+        }
+        temp=temp->next;
+    }
+    return max;
+
+}
+
+
+/*
+RC insert_into_buffer_LRU(BM_BufferPool * const bm,BM_PageHandle * const page){
+    struct buffer_stat *stat;
+    struct buffer_LRU *temp, *temp1;
+    struct buffer_pool_stat *pool_stat;
+    int searchRes;
+      stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        if(temp->pos>max){
+            max=temp->pos;
+        }
+        temp=temp->next;
+    }
+    return max;
+
+}
+*/
+
+
+RC insert_into_buffer_LRU(BM_BufferPool * const bm,BM_PageHandle * const page){
+    struct buffer_stat *stat;
+    struct buffer_LRU *temp, *temp1;
+    struct buffer_pool_stat *pool_stat;
+    int searchRes;
+      stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    temp= (struct buffer_LRU *) malloc(sizeof(struct buffer_LRU));
+    stat = bm->mgmtData;
+    pool_stat = stat->pool_Stat;
+    int sizeOfBuffer;
+    int pos=0;
+    sizeOfBuffer=lengthofBuffer();
+    if(start_lru==NULL){
+        temp->pos=0;
+        temp->age=1;
+        temp->dirty=false;
+        temp->fixCount=1;
+        temp->pHandle=page;
+        temp->pageNum=page->pageNum;
+        start_lru = temp;
+        start_lru->next = NULL;
+        
+    }
+    else{
+        
+        searchRes=searchForFrame(page->pageNum);
+        if(searchRes!=-1){
+            //element found. page pos returned
+               int i;
+               temp=start_lru;
+          
+               while(temp!=NULL){
+               
+                   if(temp->pos==searchRes){
+                       break;
+                   }
+                   temp=temp->next;
+               
+               }
+               //deleteFrameInBuffer(searchRes);
+               //temp=(struct buffer_LRU *) malloc(sizeof(struct buffer_LRU)); 
+               increment_age();
+               temp->age=1;
+               temp->dirty=false;
+               temp->fixCount=temp->fixCount+1;
+               temp->pHandle=page;
+               //temp->next=start_lru;
+               //start_lru=temp;
+
+        }
+        else{
+            //element not found
+            if(sizeOfBuffer==bm->numPages){
+               pos = LRU(); 
+               int i;
+               temp=start_lru;
+                while(temp!=NULL){
+               
+                   if(temp->pos==pos){
+                       break;
+                   }
+                   temp=temp->next;
+               
+               }
+               //deleteFrameInBuffer(pos);
+               //temp=(struct buffer_LRU *) malloc(sizeof(struct buffer_LRU)); 
+               increment_age();
+               temp->age=1;
+               temp->pos=pos;
+               temp->dirty=false;
+               temp->fixCount=1;
+               temp->pHandle=page;
+               temp->pageNum=page->pageNum;
+              // temp->next=start_lru;
+             //  start_lru=temp;
+               
+            
+            }
+            else{
+                temp1=start_lru;
+                while(temp1!=NULL){
+                    pos=temp1->pos;
+                    temp1=temp1->next;
+                }
+                temp=(struct buffer_LRU *) malloc(sizeof(struct buffer_LRU));
+                pos=maxpos();
+                temp->pos=pos+1;
+                temp->dirty=false;
+                temp->fixCount=1;
+                increment_age();
+                temp->age=1;
+                temp->pHandle=page;
+                temp->pageNum=page->pageNum;
+                temp->next=start_lru;
+                start_lru=temp;
+            
+            }
+
+        }
+
+    }
+    return RC_OK;
+
+}
+
+// Buffer Manager Interface Access Pages
+
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: Pin Pages
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC pinPage(BM_BufferPool * const bm, BM_PageHandle * const page, const PageNumber pageNum) {
+    SM_PageHandle ph;
+   
+    ph = (SM_PageHandle) malloc(PAGE_SIZE);
+      // SM_FileHandle *fh=(SM_FileHandle *)malloc(PAGE_SIZE);
+      // openPageFile(bm->pageFile,fh);
+    struct buffer_stat *stat;
+    struct buffer_LRU *temp;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    temp = (struct buffer_LRU *) malloc(sizeof (struct buffer_LRU));
+    struct buffer_LRU *node;
+    page->pageNum = pageNum;
+    stat = bm->mgmtData;
+    node=stat->buf;
+    int pos = 0;
+  //readBlock(pageNum, stat->fh, page->data);
+   readBlock(0, stat->fh, ph);
+   //page->data=ph;
+    if(page->data==NULL)
+    {
+        page->data=ph;
+    }
+    switch (bm->strategy) {
+        case RS_FIFO:
+            insert_frame_fifo_buffer(bm, page);
+            break;
+        case RS_LRU:
+            insert_into_buffer_LRU(bm,page);
+            break;
+        case RS_CLOCK:
+            //printf("CLOCK");
+            break;
+        case RS_LFU:
+            //printf("LFU");
+            break;
+        case RS_LRU_K:
+            //printf("LRU-K");
+            break;
+        default:
+            return RC_BUFFER_UNDEFINED_STRATEGY;
+    }
+    
+    
+	return RC_OK;
+}
+
+/*
+ * AUTHOR: Sindhu & Arpita
+ * METHOD: markDirty
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC markDirty(BM_BufferPool * const bm, BM_PageHandle * const page) {
+    struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+    struct buffer_LRU *node;
+    struct buffer_Queue *buf;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+    buf=(struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    stat = bm->mgmtData;
+    pool_stat = stat->pool_Stat;
+    int pos = -1;
+
+    switch (bm->strategy) {
+        case RS_FIFO:
+            pos = search_frame_fifo_buffer(page->pageNum);
+            buf=strt_fifo;
+            while(buf!=NULL)
+            {
+                if(buf->pos==pos)
+                {
+                    memcpy(buf->data,page->data,PAGE_SIZE);
+                    //buf->data=page->data;
+                    buf->dirty=true;
+                }
+                buf=buf->next;
+            }
+            //update_frame_stat_fifo_buffer(stat->buf, stat, UP_Dirty, pos);
+            break;
+        case RS_LRU:
+            pos = LRU(bm, page->pageNum);
+            while (node != NULL) {
+                if (node->pos == pos) {
+
+                    node->dirty = true;
+                    pool_stat->dirtyPages_stat[pos] = node->dirty;
+                }
+                pos = node->pos;
+                node = node->next;
+            }
+
+
+
+            break;
+        case RS_CLOCK:
+            //printf("CLOCK");
+            break;
+        case RS_LFU:
+            //printf("LFU");
+            break;
+        case RS_LRU_K:
+            //printf("LRU-K");
+            break;
+        default:
+            return RC_BUFFER_UNDEFINED_STRATEGY;
+    }
+
+    return RC_OK;
+}
+
+/*
+ * AUTHOR: Arpita and Sindhu
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC unpinPage(BM_BufferPool * const bm, BM_PageHandle * const page) {
+    struct buffer_stat *stat;
+    struct buffer_Queue *buf;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    buf=(struct buffer_Queue *) malloc(sizeof (struct buffer_Queue));
+    stat = bm->mgmtData;
+    int pos = -1;
+    int pinCount =0;
+    switch (bm->strategy) {
+        case RS_FIFO:
+            pos = search_frame_fifo_buffer(page->pageNum);
+            buf=strt_fifo;
+            while(buf!=NULL)
+            {
+                if(buf->pos==pos)
+                {
+                    //buf->pHandle=page;
+                    buf->fixCount=buf->fixCount-1;
+                            
+                }
+                buf=buf->next;
+            }
+            //update_frame_stat_fifo_buffer(stat->buf, stat, UP_Unpin, pos);
+            break;
+        case RS_LRU:// author: Sindhu
+        	pos = searchForFrame(page->pageNum);
+        	 pinCount =  bm->numPages;
+        	if(pinCount == 0){
+        		return RC_UNPIN_ERROR;
+        	}else{
+        		deleteFrameInBuffer(pos);
+        		stat->pool_Stat->dirtyPages_stat=true;
+        		pinCount =bm->numPages - 1;
+        		bm->numPages = pinCount;
+        	}
+            break;
+        case RS_CLOCK:
+            //printf("CLOCK");
+            break;
+        case RS_LFU:
+            //printf("LFU");
+            break;
+        case RS_LRU_K:
+            //printf("LRU-K");
+            break;
+        default:
+            return RC_BUFFER_UNDEFINED_STRATEGY;
+    }
+	return RC_OK;
+}
+
+/*
+ * AUTHOR: Arpita and Sindhu
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+RC forcePage(BM_BufferPool * const bm, BM_PageHandle * const page) {
+  struct buffer_stat *stat;
+    stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+    stat = bm->mgmtData;
+    int pos = -1;
+    writeBlock(page->pageNum,stat->fh,page->data);
+
+    switch (bm->strategy) {
+        case RS_FIFO:
+            pos = search_frame_fifo_buffer(page->pageNum);
+            update_frame_stat_fifo_buffer(stat->buf, stat, UP_NOT_Dirty, pos);
+            break;
+        case RS_LRU:
+        	pos = searchForFrame(page->pageNum);
+        	//addDataToBuffer(bm, page->data,pos);
+            break;
+        case RS_CLOCK:
+            //printf("CLOCK");
+            break;
+        case RS_LFU:
+            //printf("LFU");
+            break;
+        case RS_LRU_K:
+            //printf("LRU-K");
+            break;
+        default:
+            return RC_BUFFER_UNDEFINED_STRATEGY;
+    }
+	return RC_OK;
+}
+
+// Statistics Interface
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: get Fix Counts
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+PageNumber *getFrameContents(BM_BufferPool * const bm) {
+
+/*
+    int *pageNum = (int *) malloc((bm->numPages) * sizeof (int));
+    int i = 0;
+    struct buffer_LRU *node = bm->mgmtData;
+
+    while (node != 0) {
+
+
+        if (node->pageNum != NULL) {
+            pageNum[i] = node->pageNum;
+        } else {
+            pageNum[i] = NO_PAGE;
+        }
+        i++;
+        node = node->next;
+    }
+*/
+ struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+        stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+        stat=bm->mgmtData;
+        pool_stat=stat->pool_Stat;
+        return pool_stat->pageNumber_stat;
+}
+
+/*
+ * AUTHOR: Nikhil
+ * METHOD: get Fix Counts
+ * INPUT: File Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int *getFixCounts(BM_BufferPool * const bm) {
+/*
+    int *array = (int *) malloc((bm->numPages) * sizeof (int));
+    int i = 0;
+    struct buffer_LRU *node = bm->mgmtData;
+
+    while (node != 0) {
+
+        array[i] = node->fixCount;
+        i++;
+        node = node->next;
+
+    }
+
+    return array;
+*/
+ struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+        stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+        stat=bm->mgmtData;
+        pool_stat=stat->pool_Stat;
+        return pool_stat->fixCounts_stat;
+
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+bool *getDirtyFlags(BM_BufferPool * const bm) {
+        struct buffer_stat *stat;
+        struct buffer_pool_stat *pool_stat;
+        stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+        stat=bm->mgmtData;
+        pool_stat=stat->pool_Stat;
+        return pool_stat->dirtyPages_stat;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int getNumReadIO(BM_BufferPool * const bm) {
+     struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+        stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+        stat=bm->mgmtData;
+        pool_stat=stat->pool_Stat;
+        return pool_stat->readIO;
+}
+
+/*
+ * AUTHOR: Arpita
+ * METHOD: Search frame in Fifo Buffer
+ * INPUT: Data Structure
+ * OUTPUT: RC_OK-SUCESSS;RC_OTHERS-ON FAIL;
+ */
+int getNumWriteIO(BM_BufferPool * const bm) {
+     struct buffer_stat *stat;
+    struct buffer_pool_stat *pool_stat;
+        stat = (struct buffer_stat *) malloc(sizeof (struct buffer_stat));
+        pool_stat = (struct buffer_pool_stat *) malloc(sizeof (struct buffer_pool_stat));
+        stat=bm->mgmtData;
+        pool_stat=stat->pool_Stat;
+        return pool_stat->writeIO;
+}
