@@ -1,0 +1,15 @@
+CREATE TABLE test_table_r(a INT PRIMARYKEY,b VARCHAR(4),c INT);
+
+INSERT INTO test_table_r  VALUES (1,'aaaa',32);
+INSERT INTO test_table_r VALUES (2,'bbbb',23);
+INSERT INTO test_table_r  VALUES (3,'cccc',22);
+INSERT INTO test_table_r  VALUES (4,'dddd',14);
+INSERT INTO test_table_r  VALUES (5,'eeee',12);
+
+SELECT * FROM test_table_r;
+
+SELECT * FROM test_table_r where a=2;
+
+DELETE FROM test_table_r where a=2;
+
+UPDATE FROM test_table_r (5,'ffff',23);

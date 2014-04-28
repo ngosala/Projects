@@ -1,0 +1,18 @@
+Second assignment includes implementation of buffer manager that manages a buffer of blocks in memory including reading/flushing to disk and block replacement (flushing blocks to disk to make space for reading new blocks from disk).
+
+-> Implemented buffer manager which manages a fixed number of pages in memory that represent pages from a page file managed by the storage manager implemented in assignment 1.
+
+-> We use a data structure to map file associated parameters to buffer pool frames and this is implemented using  linked list.
+
+-> LRU and FIFO replacement strategies Implemented.
+
+-> initBufferPool function implemented to create a new buffer pool with numPages page frames using the page replacement strategy strategy. 
+
+-> SutdownBufferPool  function implemeted to free up all resources associated with the buffer pool.
+
+-> forceFlushPool function implemented for writting all the dirty pages from the buffer pool to the disk.
+
+-> Page Management Functions pinPage which pins the page into the disk,unpinPage for unpin the page using page number,markDirty for marking the page dirty ,forcePage for writing the current content of the page back to the page file on disk are implemented.
+
+-> Static functions getNumWriteIO,getNumReadIO,getDirtyFlags are implemented to keep track of number of reads and writes.
+
